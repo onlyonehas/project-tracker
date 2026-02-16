@@ -1,11 +1,20 @@
 import express, { Request, Response } from 'express'
 import cors from 'cors'
+import swaggerUi from 'swagger-ui-express'
+import { readFileSync } from 'fs'
+import { dirname, join } from 'path'
+import { fileURLToPath } from 'url'
+import crypto from 'crypto'
 import * as db from './db.js'
+
+function generateId(): string {
+  return crypto.randomBytes(6).toString('base64url')
+}
 import {
   validateTitle,
   validateStatus,
   validateDueDate,
-  sanitiseString
+  sanitiseString,
 } from './validation.js'
 
 const app = express()
@@ -13,6 +22,12 @@ const PORT = process.env.PORT || 3000
 
 app.use(cors())
 app.use(express.json())
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const openapiSpec = JSON.parse(
+  readFileSync(join(__dirname, '..', 'openapi.json'), 'utf-8')
+)
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpec))
 
 // Seed demo data only if database is empty
 function seedIfEmpty() {
@@ -25,25 +40,25 @@ function seedIfEmpty() {
       description: 'Check backend changes',
       status: 'pending',
       dueDate: new Date(now.getTime() + 86400000).toISOString().slice(0, 10),
-      createdBy: 'Demo User'
+      createdBy: 'Demo User',
     },
     {
       title: 'Update docs',
       description: 'Add API section',
       status: 'in-progress',
       dueDate: new Date().toISOString().slice(0, 10),
-      createdBy: 'Demo User'
+      createdBy: 'Demo User',
     },
     {
       title: 'Deploy staging',
       description: 'Run deployment',
       status: 'completed',
       dueDate: new Date(now.getTime() - 86400000).toISOString().slice(0, 10),
-      createdBy: 'Demo User'
-    }
+      createdBy: 'Demo User',
+    },
   ]
   demo.forEach((t) => {
-    const id = crypto.randomUUID()
+    const id = generateId()
     const createdAt = new Date().toISOString()
     db.createTask({
       id,
@@ -53,7 +68,7 @@ function seedIfEmpty() {
       dueDate: t.dueDate,
       createdBy: t.createdBy,
       createdAt,
-      updatedAt: createdAt
+      updatedAt: createdAt,
     })
   })
 }
@@ -88,7 +103,13 @@ app.get('/api/tasks/:id', (req: Request, res: Response) => {
 // POST /api/tasks - Create a task
 app.post('/api/tasks', (req: Request, res: Response) => {
   try {
-    const { title, description, status = 'pending', dueDate, createdBy } = req.body
+    const {
+      title,
+      description,
+      status = 'pending',
+      dueDate,
+      createdBy,
+    } = req.body
 
     const t = validateTitle(title)
     if (!t.valid) return res.status(t.statusCode).json({ error: t.error })
@@ -99,17 +120,22 @@ app.post('/api/tasks', (req: Request, res: Response) => {
     const d = validateDueDate(dueDate)
     if (!d.valid) return res.status(d.statusCode).json({ error: d.error })
 
-    const id = crypto.randomUUID()
+    const id = generateId()
     const now = new Date().toISOString()
     const task = db.createTask({
       id,
       title: (title as string).trim(),
       description: sanitiseString(description),
-      status: ['pending', 'in-progress', 'completed'].includes(status) ? status : 'pending',
-      dueDate: dueDate && typeof dueDate === 'string' && dueDate.trim() ? dueDate.trim() : null,
+      status: ['pending', 'in-progress', 'completed'].includes(status)
+        ? status
+        : 'pending',
+      dueDate:
+        dueDate && typeof dueDate === 'string' && dueDate.trim()
+          ? dueDate.trim()
+          : null,
       createdBy: sanitiseString(createdBy) || undefined,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     res.status(201).json(task)
   } catch (err) {
@@ -143,13 +169,20 @@ app.patch('/api/tasks/:id', (req: Request, res: Response) => {
 
     const updated = db.updateTask(req.params.id, {
       ...(title !== undefined && { title: (title as string).trim() }),
-      ...(description !== undefined && { description: sanitiseString(description) }),
+      ...(description !== undefined && {
+        description: sanitiseString(description),
+      }),
       ...(status !== undefined && { status }),
       ...(dueDate !== undefined && {
-        dueDate: dueDate && typeof dueDate === 'string' && dueDate.trim() ? dueDate.trim() : null
+        dueDate:
+          dueDate && typeof dueDate === 'string' && dueDate.trim()
+            ? dueDate.trim()
+            : null,
       }),
-      ...(createdBy !== undefined && { createdBy: sanitiseString(createdBy) || undefined }),
-      updatedAt: new Date().toISOString()
+      ...(createdBy !== undefined && {
+        createdBy: sanitiseString(createdBy) || undefined,
+      }),
+      updatedAt: new Date().toISOString(),
     })
 
     res.json(updated)
@@ -173,6 +206,8 @@ app.delete('/api/tasks/:id', (req: Request, res: Response) => {
   }
 })
 
-app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`))
+app.listen(PORT, () =>
+  console.log(`Backend running on http://localhost:${PORT}`)
+)
 
 export default app
