@@ -1,6 +1,12 @@
 import express, { Request, Response } from 'express'
 import cors from 'cors'
-import { validateTitle, validateStatus, validateDueDate, sanitiseString } from './validation'
+import * as db from './db'
+import {
+  validateTitle,
+  validateStatus,
+  validateDueDate,
+  sanitiseString
+} from './validation'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -8,86 +14,163 @@ const PORT = process.env.PORT || 3000
 app.use(cors())
 app.use(express.json())
 
-interface Task {
-  id: string
-  title: string
-  description: string
-  status: string
-  dueDate: string | null
-  createdAt: string
-  updatedAt: string
+// Seed demo data only if database is empty
+function seedIfEmpty() {
+  const all = db.getAllTasks()
+  if (all.length > 0) return
+  const now = new Date()
+  const demo = [
+    {
+      title: 'Review PR #42',
+      description: 'Check backend changes',
+      status: 'pending',
+      dueDate: new Date(now.getTime() + 86400000).toISOString().slice(0, 10),
+      createdBy: 'Demo User'
+    },
+    {
+      title: 'Update docs',
+      description: 'Add API section',
+      status: 'in-progress',
+      dueDate: new Date().toISOString().slice(0, 10),
+      createdBy: 'Demo User'
+    },
+    {
+      title: 'Deploy staging',
+      description: 'Run deployment',
+      status: 'completed',
+      dueDate: new Date(now.getTime() - 86400000).toISOString().slice(0, 10),
+      createdBy: 'Demo User'
+    }
+  ]
+  demo.forEach((t) => {
+    const id = crypto.randomUUID()
+    const createdAt = new Date().toISOString()
+    db.createTask({
+      id,
+      title: t.title,
+      description: t.description,
+      status: t.status,
+      dueDate: t.dueDate,
+      createdBy: t.createdBy,
+      createdAt,
+      updatedAt: createdAt
+    })
+  })
 }
 
-const tasks = new Map<string, Task>()
-let nextId = 1
+seedIfEmpty()
 
-;[
-  { title: 'Review PR #42', description: 'Check backend changes', status: 'pending', dueDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10) },
-  { title: 'Update docs', description: 'Add API section', status: 'in-progress', dueDate: new Date().toISOString().slice(0, 10) },
-  { title: 'Deploy staging', description: 'Run deployment', status: 'completed', dueDate: new Date(Date.now() - 86400000).toISOString().slice(0, 10) }
-].forEach((t) => {
-  const id = String(nextId++)
-  const now = new Date().toISOString()
-  tasks.set(id, { id, ...t, createdAt: now, updatedAt: now } as Task)
-})
-
+// GET /api/tasks - Retrieve all tasks
 app.get('/api/tasks', (_req: Request, res: Response) => {
-  res.json(Array.from(tasks.values()))
-})
-
-app.get('/api/tasks/:id', (req: Request, res: Response) => {
-  const task = tasks.get(req.params.id)
-  if (!task) return res.status(404).json({ error: 'Task not found' })
-  res.json(task)
-})
-
-app.post('/api/tasks', (req: Request, res: Response) => {
-  const { title, description, status = 'pending', dueDate } = req.body
-  const t = validateTitle(title)
-  if (!t.valid) return res.status(t.statusCode).json({ error: t.error })
-  const s = validateStatus(status)
-  if (!s.valid) return res.status(s.statusCode).json({ error: s.error })
-  const d = validateDueDate(dueDate)
-  if (!d.valid) return res.status(d.statusCode).json({ error: d.error })
-  const id = String(nextId++)
-  const now = new Date().toISOString()
-  const task: Task = {
-    id,
-    title: (title as string).trim(),
-    description: sanitiseString(description),
-    status: ['pending', 'in-progress', 'completed'].includes(status) ? status : 'pending',
-    dueDate: dueDate && typeof dueDate === 'string' && dueDate.trim() ? dueDate.trim() : null,
-    createdAt: now,
-    updatedAt: now
+  try {
+    const tasks = db.getAllTasks()
+    res.json(tasks)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Failed to retrieve tasks' })
   }
-  tasks.set(id, task)
-  res.status(201).json(task)
 })
 
-app.patch('/api/tasks/:id', (req: Request, res: Response) => {
-  const task = tasks.get(req.params.id)
-  if (!task) return res.status(404).json({ error: 'Task not found' })
-  const { title, description, status, dueDate } = req.body
-  if (title !== undefined) {
+// GET /api/tasks/:id - Retrieve a task by ID
+app.get('/api/tasks/:id', (req: Request, res: Response) => {
+  try {
+    const task = db.getTaskById(req.params.id)
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' })
+    }
+    res.json(task)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Failed to retrieve task' })
+  }
+})
+
+// POST /api/tasks - Create a task
+app.post('/api/tasks', (req: Request, res: Response) => {
+  try {
+    const { title, description, status = 'pending', dueDate, createdBy } = req.body
+
     const t = validateTitle(title)
     if (!t.valid) return res.status(t.statusCode).json({ error: t.error })
-    task.title = (title as string).trim()
-  }
-  if (description !== undefined) task.description = sanitiseString(description)
-  if (status !== undefined) {
+
     const s = validateStatus(status)
     if (!s.valid) return res.status(s.statusCode).json({ error: s.error })
-    task.status = status
+
+    const d = validateDueDate(dueDate)
+    if (!d.valid) return res.status(d.statusCode).json({ error: d.error })
+
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+    const task = db.createTask({
+      id,
+      title: (title as string).trim(),
+      description: sanitiseString(description),
+      status: ['pending', 'in-progress', 'completed'].includes(status) ? status : 'pending',
+      dueDate: dueDate && typeof dueDate === 'string' && dueDate.trim() ? dueDate.trim() : null,
+      createdBy: sanitiseString(createdBy) || undefined,
+      createdAt: now,
+      updatedAt: now
+    })
+    res.status(201).json(task)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Failed to create task' })
   }
-  if (dueDate !== undefined) task.dueDate = dueDate && typeof dueDate === 'string' && dueDate.trim() ? dueDate.trim() : null
-  task.updatedAt = new Date().toISOString()
-  res.json(task)
 })
 
+// PATCH /api/tasks/:id - Update a task (including status)
+app.patch('/api/tasks/:id', (req: Request, res: Response) => {
+  try {
+    const existing = db.getTaskById(req.params.id)
+    if (!existing) {
+      return res.status(404).json({ error: 'Task not found' })
+    }
+
+    const { title, description, status, dueDate, createdBy } = req.body
+
+    if (title !== undefined) {
+      const t = validateTitle(title)
+      if (!t.valid) return res.status(t.statusCode).json({ error: t.error })
+    }
+    if (status !== undefined) {
+      const s = validateStatus(status)
+      if (!s.valid) return res.status(s.statusCode).json({ error: s.error })
+    }
+    if (dueDate !== undefined) {
+      const d = validateDueDate(dueDate)
+      if (!d.valid) return res.status(d.statusCode).json({ error: d.error })
+    }
+
+    const updated = db.updateTask(req.params.id, {
+      ...(title !== undefined && { title: (title as string).trim() }),
+      ...(description !== undefined && { description: sanitiseString(description) }),
+      ...(status !== undefined && { status }),
+      ...(dueDate !== undefined && {
+        dueDate: dueDate && typeof dueDate === 'string' && dueDate.trim() ? dueDate.trim() : null
+      }),
+      ...(createdBy !== undefined && { createdBy: sanitiseString(createdBy) || undefined }),
+      updatedAt: new Date().toISOString()
+    })
+
+    res.json(updated)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Failed to update task' })
+  }
+})
+
+// DELETE /api/tasks/:id - Delete a task
 app.delete('/api/tasks/:id', (req: Request, res: Response) => {
-  if (!tasks.has(req.params.id)) return res.status(404).json({ error: 'Task not found' })
-  tasks.delete(req.params.id)
-  res.status(204).send()
+  try {
+    const deleted = db.deleteTask(req.params.id)
+    if (!deleted) {
+      return res.status(404).json({ error: 'Task not found' })
+    }
+    res.status(204).send()
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Failed to delete task' })
+  }
 })
 
 app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`))
