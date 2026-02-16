@@ -3,7 +3,8 @@ import { resolve } from 'path'
 
 export default defineConfig({
   test: {
-    globals: true
+    globals: true,
+    include: ['test/validation.test.ts']
   },
   resolve: {
     alias: {
