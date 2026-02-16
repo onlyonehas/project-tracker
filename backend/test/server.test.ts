@@ -12,6 +12,7 @@ async function run() {
     console.log('POST /api/tasks:', c.status === 201 ? 'OK' : 'fail')
     if (c.data && typeof c.data === 'object' && 'id' in c.data) {
       const id = (c.data as { id: string }).id
+      console.log('GET /api/tasks/:id:', (await req('GET', api('/' + id))).status === 200 ? 'OK' : 'fail')
       console.log('PATCH:', (await req('PATCH', api('/' + id), { title: 'Updated' })).status === 200 ? 'OK' : 'fail')
       console.log('DELETE:', (await req('DELETE', api('/' + id))).status === 204 ? 'OK' : 'fail')
     }
