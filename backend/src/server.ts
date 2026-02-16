@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express'
 import cors from 'cors'
+import { validateTitle, validateStatus, validateDueDate, sanitiseString } from './validation'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -20,7 +21,6 @@ interface Task {
 const tasks = new Map<string, Task>()
 let nextId = 1
 
-// Seed demo data
 ;[
   { title: 'Review PR #42', description: 'Check backend changes', status: 'pending', dueDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10) },
   { title: 'Update docs', description: 'Add API section', status: 'in-progress', dueDate: new Date().toISOString().slice(0, 10) },
@@ -31,25 +31,32 @@ let nextId = 1
   tasks.set(id, { id, ...t, createdAt: now, updatedAt: now } as Task)
 })
 
-// GET /api/tasks - retrieve all tasks
 app.get('/api/tasks', (_req: Request, res: Response) => {
   res.json(Array.from(tasks.values()))
 })
 
-// POST /api/tasks - create a task
+app.get('/api/tasks/:id', (req: Request, res: Response) => {
+  const task = tasks.get(req.params.id)
+  if (!task) return res.status(404).json({ error: 'Task not found' })
+  res.json(task)
+})
+
 app.post('/api/tasks', (req: Request, res: Response) => {
   const { title, description, status = 'pending', dueDate } = req.body
-  if (!title || typeof title !== 'string' || title.trim() === '') {
-    return res.status(400).json({ error: 'Title is required' })
-  }
+  const t = validateTitle(title)
+  if (!t.valid) return res.status(t.statusCode).json({ error: t.error })
+  const s = validateStatus(status)
+  if (!s.valid) return res.status(s.statusCode).json({ error: s.error })
+  const d = validateDueDate(dueDate)
+  if (!d.valid) return res.status(d.statusCode).json({ error: d.error })
   const id = String(nextId++)
   const now = new Date().toISOString()
   const task: Task = {
     id,
-    title: title.trim(),
-    description: (description && typeof description === 'string') ? description.trim() : '',
+    title: (title as string).trim(),
+    description: sanitiseString(description),
     status: ['pending', 'in-progress', 'completed'].includes(status) ? status : 'pending',
-    dueDate: dueDate || null,
+    dueDate: dueDate && typeof dueDate === 'string' && dueDate.trim() ? dueDate.trim() : null,
     createdAt: now,
     updatedAt: now
   }
@@ -57,23 +64,26 @@ app.post('/api/tasks', (req: Request, res: Response) => {
   res.status(201).json(task)
 })
 
-// PATCH /api/tasks/:id - update a task
 app.patch('/api/tasks/:id', (req: Request, res: Response) => {
   const task = tasks.get(req.params.id)
   if (!task) return res.status(404).json({ error: 'Task not found' })
   const { title, description, status, dueDate } = req.body
   if (title !== undefined) {
-    if (typeof title !== 'string' || title.trim() === '') return res.status(400).json({ error: 'Title cannot be empty' })
-    task.title = title.trim()
+    const t = validateTitle(title)
+    if (!t.valid) return res.status(t.statusCode).json({ error: t.error })
+    task.title = (title as string).trim()
   }
-  if (description !== undefined) task.description = typeof description === 'string' ? description.trim() : ''
-  if (status !== undefined && ['pending', 'in-progress', 'completed'].includes(status)) task.status = status
-  if (dueDate !== undefined) task.dueDate = dueDate || null
+  if (description !== undefined) task.description = sanitiseString(description)
+  if (status !== undefined) {
+    const s = validateStatus(status)
+    if (!s.valid) return res.status(s.statusCode).json({ error: s.error })
+    task.status = status
+  }
+  if (dueDate !== undefined) task.dueDate = dueDate && typeof dueDate === 'string' && dueDate.trim() ? dueDate.trim() : null
   task.updatedAt = new Date().toISOString()
   res.json(task)
 })
 
-// DELETE /api/tasks/:id - delete a task
 app.delete('/api/tasks/:id', (req: Request, res: Response) => {
   if (!tasks.has(req.params.id)) return res.status(404).json({ error: 'Task not found' })
   tasks.delete(req.params.id)
