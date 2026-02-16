@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm run install:all
+      - run: npm run build
+      - run: npm run lint
+      - run: npm run dev:backend &
+      - run: sleep 3 && npm run test:backend
+      - run: npm run test:frontend
