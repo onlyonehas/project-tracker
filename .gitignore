@@ -6,3 +6,8 @@ dist/
 build/
 coverage/
 .nyc_output/
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+.history-backup
