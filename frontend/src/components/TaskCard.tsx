@@ -31,9 +31,16 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
 
   return (
     <li className="task-card" data-id={task.id}>
-      <h3>{task.title}</h3>
+      <div className="task-header">
+        <h3>{task.title}</h3>
+        <span className="task-id" title={`ID: ${task.id}`}>
+          #{task.id}
+        </span>
+      </div>
       <div className="task-meta">
-        <span className={`badge ${statusClass}`}>{task.status || 'pending'}</span>
+        <span className={`badge ${statusClass}`}>
+          {task.status || 'pending'}
+        </span>
         <span>{due}</span>
         {task.createdBy && <span>By {task.createdBy}</span>}
       </div>
