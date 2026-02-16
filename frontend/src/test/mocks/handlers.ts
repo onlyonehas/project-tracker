@@ -3,7 +3,7 @@ import type { Task, TaskFormData } from '../../types'
 
 const API_BASE = 'http://localhost:3000/api'
 
-let tasks: Task[] = [
+const tasks: Task[] = [
   {
     id: '1',
     title: 'Test Task 1',
