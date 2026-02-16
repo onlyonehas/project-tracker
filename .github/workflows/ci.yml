@@ -16,8 +16,8 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm run install:all
+      - run: npm run lint:fix
       - run: npm run build
-      - run: npm run lint
       - run: npm run dev:backend &
       - run: sleep 3 && npm run test:backend
       - run: npm run test:frontend
