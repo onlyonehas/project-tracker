@@ -1,12 +1,12 @@
 import express, { Request, Response } from 'express'
 import cors from 'cors'
-import * as db from './db'
+import * as db from './db.js'
 import {
   validateTitle,
   validateStatus,
   validateDueDate,
   sanitiseString
-} from './validation'
+} from './validation.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
