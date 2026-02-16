@@ -101,7 +101,7 @@ function App() {
 
   // Filter and sort tasks
   const filteredAndSortedTasks = useMemo(() => {
-    let filtered = tasks.filter(task => {
+    const filtered = tasks.filter(task => {
       const matchStatus = filter === 'all' || task.status === filter
       if (!matchStatus) return false
       
