@@ -13,22 +13,19 @@ frontend/    React app
 
 ```mermaid
 flowchart LR
-    subgraph Client
-        Browser[Browser]
-    end
-
-    subgraph Frontend
-        React[React + Vite]
-    end
-
-    subgraph Backend
-        Express[Express API]
-        SQLite[(SQLite)]
-    end
-
-    Browser --> React
-    React -->|REST :3000| Express
-    Express --> SQLite
+  subgraph Client
+    Browser[Browser]
+  end
+  subgraph Frontend
+    React[React + Vite]
+  end
+  subgraph Backend
+    Express[Express API]
+    SQLite[(SQLite)]
+  end
+  Browser --> React
+  React -->|REST| Express
+  Express --> SQLite
 ```
 
 - **Frontend**: React + Vite, talks to backend on port 3000
