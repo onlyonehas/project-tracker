@@ -16,6 +16,7 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm run install:all
+      - run: npm audit --audit-level=high || true
       - run: npm run lint:fix
       - run: npm run build
       - run: npm run dev:backend &

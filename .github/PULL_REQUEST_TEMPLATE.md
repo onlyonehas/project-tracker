@@ -1,0 +1,18 @@
+**Before creating a pull request make sure that:**
+
+- [ ] Commit messages are meaningful and follow good commit message guidelines
+- [ ] README and other documentation has been updated / added (if needed)
+- [ ] Tests have been updated / new tests have been added (if needed)
+
+Please remove this line and everything above and fill the following sections:
+
+### Change description ###
+
+
+
+**Does this PR introduce a breaking change?** (check one with "x")
+
+```
+[ ] Yes
+[ ] No
+```
